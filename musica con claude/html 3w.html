@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎵 NeonWave — Reproductor Musical</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <!-- ═══════════════════════════════════════════════
+       SECCIÓN CSS — Estilos del Reproductor
+       Técnicas utilizadas:
+       ✔ Variables CSS (tokens de diseño)
+       ✔ Glassmorphism + Neón
+       ✔ Animaciones @keyframes
+       ✔ Grid & Flexbox responsive
+       ✔ Pseudo-elementos decorativos
+  ════════════════════════════════════════════════ -->
+  <style>
+    /* ── 1. TOKENS DE DISEÑO ───────────────────────── */
+    :root {
+      --c-bg:        #07060f;
+      --c-surface:   rgba(255,255,255,.04);
+      --c-border:    rgba(255,255,255,.09);
+      --c-accent1:   #c45eff;   /* violeta neón */
+      --c-accent2:   #00e5ff;   /* cian eléctrico */
+      --c-accent3:   #ff3d6e;   /* rosa coral */
+      --c-text:      #f0eaff;
+      --c-muted:     rgba(240,234,255,.4);
+      --radius-card: 24px;
+      --radius-btn:  50px;
+      --glass-blur:  22px;
+      --transition:  .35s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ── 2. RESET Y BASE ───────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      padding: 2rem 1rem;
+    }
+
+    /* ── 3. FONDO ANIMADO ──────────────────────────── */
+    /* Orbes de luz que se desplazan lentamente — efecto "aurora" */
+    .bg-canvas {
+      position: fixed; inset: 0; z-index: 0;
+      overflow: hidden; pointer-events: none;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: .35;
+      animation: float-orb 18s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 520px; height: 520px; background: var(--c-accent1); top: -120px; left: -80px; animation-duration: 20s; }
+    .orb-2 { width: 380px; height: 380px; background: var(--c-accent2); bottom: -60px; right: -60px; animation-duration: 15s; animation-delay: -7s; }
+    .orb-3 { width: 280px; height: 280px; background: var(--c-accent3); top: 40%; left: 45%; animation-duration: 12s; animation-delay: -3s; }
+
+    @keyframes float-orb {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(60px, 40px) scale(1.18); }
+    }
+
+    /* Grid de partículas (canvas JS lo dibuja encima) */
+    #particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    /* ── 4. LAYOUT PRINCIPAL ───────────────────────── */
+    .app {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 1080px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 1.5rem;
+    }
+
+    /* ── 5. TARJETA GLASSMORPHISM ──────────────────── */
+    .glass {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border-radius: var(--radius-card);
+    }
+
+    /* ── 6. PANEL PRINCIPAL DEL REPRODUCTOR ────────── */
+    .player-card {
+      padding: 2.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Etiqueta de género activo */
+    .genre-badge {
+      align-self: flex-start;
+      font-family: 'Space Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      padding: .35rem .9rem;
+      border-radius: 50px;
+      border: 1px solid var(--c-accent1);
+      color: var(--c-accent1);
+      box-shadow: 0 0 12px rgba(196,94,255,.3);
+    }
+
+    /* ── 7. COVER / ARTWORK ────────────────────────── */
+    .artwork-wrapper {
+      position: relative;
+      width: 100%; aspect-ratio: 1;
+      max-width: 300px;
+      align-self: center;
+    }
+    /* Anillo giratorio neón */
+    .artwork-ring {
+      position: absolute; inset: -14px;
+      border-radius: 50%;
+      background: conic-gradient(var(--c-accent1), var(--c-accent2), var(--c-accent3), var(--c-accent1));
+      animation: spin-ring 6s linear infinite;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .artwork-ring.playing { opacity: 1; }
+    @keyframes spin-ring { to { transform: rotate(360deg); } }
+
+    /* Máscara para el artwork */
+    .artwork-mask {
+      position: relative; z-index: 1;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 4px solid var(--c-bg);
+    }
+    /* Disco SVG generado con CSS */
+    .artwork-disc {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4.5rem;
+      transition: transform var(--transition);
+      animation: none;
+    }
+    .artwork-disc.spinning { animation: disc-spin 4s linear infinite; }
+    @keyframes disc-spin { to { transform: rotate(360deg); } }
+
+    /* Pulso de audio alrededor de la portada */
+    .audio-pulse {
+      position: absolute; inset: -30px;
+      border-radius: 50%;
+      border: 2px solid rgba(196,94,255,.2);
+      animation: pulse-ring 2s ease-out infinite;
+      opacity: 0;
+    }
+    .audio-pulse.active { opacity: 1; }
+    .audio-pulse:nth-child(2) { animation-delay: .6s; }
+    .audio-pulse:nth-child(3) { animation-delay: 1.2s; }
+    @keyframes pulse-ring {
+      0%   { transform: scale(.85); opacity: .6; }
+      100% { transform: scale(1.35); opacity: 0; }
+    }
+
+    /* ── 8. INFO DE CANCIÓN ─────────────────────────── */
+    .song-info { text-align: center; }
+    .song-title {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      background: linear-gradient(135deg, var(--c-text), var(--c-accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .song-artist {
+      margin-top: .4rem;
+      font-size: .9rem;
+      color: var(--c-muted);
+      font-family: 'Space Mono', monospace;
+      letter-spacing: .05em;
+    }
+
+    /* ── 9. BARRA DE PROGRESO ───────────────────────── */
+    .progress-section { display: flex; flex-direction: column; gap: .6rem; }
+    .progress-track {
+      width: 100%; height: 6px;
+      background: rgba(255,255,255,.1);
+      border-radius: 99px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Relleno animado con degradado neón */
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--c-accent1), var(--c-accent2));
+      box-shadow: 0 0 10px var(--c-accent1);
+      transition: width .4s linear;
+      position: relative;
+    }
+    /* Pulso en el extremo del progreso */
+    .progress-fill::after {
+      content: '';
+      position: absolute; right: -3px; top: 50%;
+      transform: translateY(-50%);
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 8px var(--c-accent2);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    .progress-track:hover .progress-fill::after { opacity: 1; }
+
+    .time-labels {
+      display: flex; justify-content: space-between;
+      font-family: 'Space Mono', monospace;
+      font-size: .72rem;
+      color: var(--c-muted);
+    }
+
+    /* ── 10. CONTROLES DE REPRODUCCIÓN ─────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+    }
+    .btn-ctrl {
+      background: none; border: none; cursor: pointer;
+      color: var(--c-muted);
+      transition: color var(--transition), transform var(--transition);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      padding: .4rem;
+    }
+    .btn-ctrl:hover { color: var(--c-text); transform: scale(1.15); }
+    .btn-ctrl svg { width: 24px; height: 24px; fill: currentColor; }
+
+    /* Botón Play central — destacado */
+    .btn-play {
+      width: 62px; height: 62px;
+      background: linear-gradient(135deg, var(--c-accent1), var(--c-accent2));
+      border: none; border-radius: 50%;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 24px rgba(196,94,255,.5), 0 0 48px rgba(0,229,255,.2);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .btn-play:hover { transform: scale(1.1); box-shadow: 0 0 36px rgba(196,94,255,.7), 0 0 64px rgba(0,229,255,.3); }
+    .btn-play:active { transform: scale(.95); }
+    .btn-play svg { width: 26px; height: 26px; fill: #fff; }
+
+    /* Botón activo (shuffle/repeat encendido) */
+    .btn-ctrl.active { color: var(--c-accent1); }
+
+    /* ── 11. CONTROL DE VOLUMEN ─────────────────────── */
+    .volume-row {
+      display: flex; align-items: center; gap: .8rem;
+    }
+    .volume-icon { color: var(--c-muted); flex-shrink: 0; }
+    .volume-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%; height: 4px;
+      border-radius: 99px;
+      background: rgba(255,255,255,.12);
+      cursor: pointer;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--c-accent1);
+      box-shadow: 0 0 8px var(--c-accent1);
+      cursor: pointer;
+      transition: transform .2s;
+    }
+    input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.3); }
+
+    /* ── 12. PLAYLIST ───────────────────────────────── */
+    .playlist-card {
+      padding: 1.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 580px;
+    }
+    .playlist-header {
+      font-size: .7rem;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--c-muted);
+      padding-bottom: .8rem;
+      border-bottom: 1px solid var(--c-border);
+    }
+    .playlist-list {
+      list-style: none;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+      flex: 1;
+      /* Scrollbar personalizado */
+      scrollbar-width: thin;
+      scrollbar-color: rgba(196,94,255,.4) transparent;
+    }
+    .playlist-list::-webkit-scrollbar { width: 4px; }
+    .playlist-list::-webkit-scrollbar-thumb { background: rgba(196,94,255,.4); border-radius: 99px; }
+
+    .playlist-item {
+      display: flex; align-items: center; gap: .8rem;
+      padding: .75rem .9rem;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background var(--transition), transform var(--transition);
+      border: 1px solid transparent;
+    }
+    .playlist-item:hover {
+      background: rgba(255,255,255,.06);
+      transform: translateX(4px);
+    }
+    .playlist-item.active {
+      background: rgba(196,94,255,.12);
+      border-color: rgba(196,94,255,.25);
+    }
+    .track-num {
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      color: var(--c-muted);
+      width: 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .playlist-item.active .track-num { color: var(--c-accent1); }
+    /* Equalizador animado para la pista activa */
+    .eq-bars {
+      display: none;
+      gap: 2px;
+      align-items: flex-end;
+      height: 16px;
+    }
+    .playlist-item.active .eq-bars { display: flex; }
+    .playlist-item.active .track-num-hidden { display: none; }
+    .eq-bar {
+      width: 3px; background: var(--c-accent1); border-radius: 2px;
+      animation: eq-bounce .7s ease-in-out infinite alternate;
+    }
+    .eq-bar:nth-child(2) { animation-duration: .5s; animation-delay: .1s; }
+    .eq-bar:nth-child(3) { animation-duration: .9s; animation-delay: .2s; }
+    @keyframes eq-bounce {
+      from { height: 4px; }
+      to   { height: 14px; }
+    }
+    .track-thumb {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      background: rgba(255,255,255,.06);
+    }
+    .track-details { flex: 1; min-width: 0; }
+    .track-name {
+      font-size: .88rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: .72rem;
+      color: var(--c-muted);
+      font-family: 'Space Mono', monospace;
+      margin-top: .15rem;
+    }
+    .track-dur {
+      font-family: 'Space Mono', monospace;
+      font-size: .7rem;
+      color: var(--c-muted);
+      flex-shrink: 0;
+    }
+
+    /* ── 13. VISUALIZADOR DE ONDAS (canvas) ─────────── */
+    #visualizer {
+      width: 100%; height: 60px;
+      border-radius: 12px;
+      opacity: .7;
+    }
+
+    /* ── 14. FOOTER DE CRÉDITOS ─────────────────────── */
+    .credits {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .12em;
+      color: rgba(255,255,255,.2);
+      padding: .5rem 0;
+    }
+
+    /* ── 15. RESPONSIVE ─────────────────────────────── */
+    @media (max-width: 720px) {
+      .app { grid-template-columns: 1fr; }
+      .playlist-card { max-height: 320px; }
+    }
+  </style>
+</head>
+
+<!-- ═══════════════════════════════════════════════
+     SECCIÓN HTML — Estructura del Reproductor
+     Organización:
+     1. Fondo animado (orbes + partículas)
+     2. Tarjeta del reproductor (artwork, info, controles)
+     3. Tarjeta de playlist
+     4. Sección JavaScript al final
+════════════════════════════════════════════════ -->
+<body>
+
+  <!-- 1. FONDO ANIMADO ─────────────────────────── -->
+  <div class="bg-canvas" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <!-- Canvas para partículas flotantes (JS lo controla) -->
+  <canvas id="particles" aria-hidden="true"></canvas>
+
+  <!-- 2. CONTENEDOR PRINCIPAL ──────────────────── -->
+  <main class="app" role="main">
+
+    <!-- ── REPRODUCTOR PRINCIPAL ─── -->
+    <article class="glass player-card" aria-label="Reproductor de música">
+
+      <!-- Etiqueta de género -->
+      <span class="genre-badge" id="genreBadge">Electronic · Synthwave</span>
+
+      <!-- Artwork / portada del álbum -->
+      <div class="artwork-wrapper">
+        <!-- Pulsos de audio al reproducir -->
+        <div class="audio-pulse" aria-hidden="true"></div>
+        <div class="audio-pulse" aria-hidden="true"></div>
+        <div class="audio-pulse" aria-hidden="true"></div>
+        <!-- Anillo giratorio neón -->
+        <div class="artwork-ring" id="artworkRing" aria-hidden="true"></div>
+        <!-- Disco con emoji como portada -->
+        <div class="artwork-mask">
+          <div class="artwork-disc" id="artworkDisc">🎵</div>
+        </div>
+      </div>
+
+      <!-- Información de la canción actual -->
+      <div class="song-info">
+        <h1 class="song-title" id="songTitle">Neon Dreams</h1>
+        <p class="song-artist" id="songArtist">Synthwave Collective</p>
+      </div>
+
+      <!-- Barra de progreso -->
+      <div class="progress-section">
+        <div class="progress-track" id="progressTrack" role="slider"
+             aria-label="Progreso de la canción" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="time-labels">
+          <span id="currentTime">0:00</span>
+          <span id="totalTime">0:00</span>
+        </div>
+      </div>
+
+      <!-- Controles de reproducción -->
+      <div class="controls" role="group" aria-label="Controles de reproducción">
+
+        <!-- Aleatorio -->
+        <button class="btn-ctrl" id="btnShuffle" aria-label="Aleatorio" title="Aleatorio">
+          <svg viewBox="0 0 24 24"><path d="M17 4l3 3-3 3M14 7h6M3 17h4l3-3-3-3H3M17 20l3-3-3-3M14 17h6"/><path d="M3 7h4l10 10h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Anterior -->
+        <button class="btn-ctrl" id="btnPrev" aria-label="Canción anterior">
+          <svg viewBox="0 0 24 24"><path d="M19 20L9 12l10-8v16zM5 4h2v16H5z"/></svg>
+        </button>
+
+        <!-- Play / Pausa -->
+        <button class="btn-play" id="btnPlay" aria-label="Reproducir / Pausar">
+          <svg id="iconPlay" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="iconPause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+
+        <!-- Siguiente -->
+        <button class="btn-ctrl" id="btnNext" aria-label="Siguiente canción">
+          <svg viewBox="0 0 24 24"><path d="M5 4l10 8-10 8V4zM17 4h2v16h-2z"/></svg>
+        </button>
+
+        <!-- Repetir -->
+        <button class="btn-ctrl" id="btnRepeat" aria-label="Repetir" title="Repetir">
+          <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        </button>
+      </div>
+
+      <!-- Visualizador de ondas -->
+      <canvas id="visualizer" aria-hidden="true"></canvas>
+
+      <!-- Control de volumen -->
+      <div class="volume-row">
+        <span class="volume-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </span>
+        <input type="range" id="volumeSlider" min="0" max="100" value="75"
+               aria-label="Control de volumen" />
+        <span class="volume-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </span>
+      </div>
+    </article>
+
+    <!-- ── PLAYLIST ─── -->
+    <aside class="glass playlist-card" aria-label="Lista de reproducción">
+      <p class="playlist-header">▸ Cola de reproducción</p>
+      <ul class="playlist-list" id="playlistEl" role="listbox" aria-label="Canciones">
+        <!-- Los ítems se generan dinámicamente con JavaScript -->
+      </ul>
+    </aside>
+
+    <!-- Créditos del proyecto -->
+    <footer class="credits">
+      NeonWave Player · HTML + CSS + JavaScript · Proyecto académico
+    </footer>
+  </main>
+
+
+  <!-- ═══════════════════════════════════════════════
+       SECCIÓN JAVASCRIPT — Lógica del Reproductor
+       Módulos:
+       1. DATOS  — Playlist con metadatos
+       2. ESTADO — Variables de control de reproducción
+       3. DOM    — Referencias a elementos HTML
+       4. RENDER — Actualización de la interfaz
+       5. PLAYER — Lógica de play/pausa/navegación
+       6. PROGRESO — Barra de tiempo simulada
+       7. PARTÍCULAS — Fondo animado con canvas
+       8. VISUALIZADOR — Ondas de audio simuladas
+       9. EVENTOS — Binding de todos los controles
+  ════════════════════════════════════════════════ -->
+  <script>
+    /* ─── 1. DATOS DE LA PLAYLIST ───────────────────── */
+    /*
+      En un proyecto real estas canciones vendrían de una API
+      o del sistema de archivos. Aquí simulamos los datos.
+    */
+    const PLAYLIST = [
+      { id:1, title:"Neon Dreams",        artist:"Synthwave Collective", duration:214, emoji:"🌆", genre:"Electronic · Synthwave", color:"#c45eff" },
+      { id:2, title:"Midnight Circuit",   artist:"Digital Pulse",        duration:187, emoji:"⚡", genre:"Electronic · Techno",    color:"#00e5ff" },
+      { id:3, title:"Aurora Protocol",    artist:"Cosmic Array",         duration:245, emoji:"🌌", genre:"Ambient · Electronic",   color:"#ff3d6e" },
+      { id:4, title:"Pulse of the City",  artist:"Metro Frequencies",    duration:203, emoji:"🏙️", genre:"Electronic · House",     color:"#ffd93d" },
+      { id:5, title:"Stellar Drift",      artist:"Orbital Mechanics",    duration:298, emoji:"🚀", genre:"Electronic · Space",     color:"#6bffa8" },
+      { id:6, title:"Chrome & Fire",      artist:"Neon Architects",      duration:178, emoji:"🔥", genre:"Electronic · Industrial",color:"#ff7043" },
+      { id:7, title:"Quantum Echoes",     artist:"Particle Wave",        duration:221, emoji:"🌀", genre:"Ambient · Glitch",       color:"#7c4dff" },
+    ];
+
+    /* ─── 2. ESTADO DE LA APLICACIÓN ────────────────── */
+    const state = {
+      currentIndex: 0,   // Índice de la canción actual
+      isPlaying:    false,
+      isShuffle:    false,
+      isRepeat:     false,
+      volume:       75,
+      progress:     0,   // 0–100 (porcentaje)
+      elapsed:      0,   // segundos transcurridos
+      timerID:      null // referencia al setInterval del progreso
+    };
+
+    /* ─── 3. REFERENCIAS AL DOM ─────────────────────── */
+    const $ = id => document.getElementById(id);
+    const dom = {
+      title:        $("songTitle"),
+      artist:       $("songArtist"),
+      genre:        $("genreBadge"),
+      disc:         $("artworkDisc"),
+      ring:         $("artworkRing"),
+      pulses:       document.querySelectorAll(".audio-pulse"),
+      progressFill: $("progressFill"),
+      progressTrack:$("progressTrack"),
+      currentTime:  $("currentTime"),
+      totalTime:    $("totalTime"),
+      btnPlay:      $("btnPlay"),
+      iconPlay:     $("iconPlay"),
+      iconPause:    $("iconPause"),
+      btnPrev:      $("btnPrev"),
+      btnNext:      $("btnNext"),
+      btnShuffle:   $("btnShuffle"),
+      btnRepeat:    $("btnRepeat"),
+      volumeSlider: $("volumeSlider"),
+      playlist:     $("playlistEl"),
+      visualizer:   $("visualizer"),
+    };
+
+    /* ─── 4. UTILIDADES ─────────────────────────────── */
+    /* Convierte segundos a formato M:SS */
+    function formatTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    /* ─── 5. RENDER — Actualizar la interfaz ────────── */
+    function renderSong() {
+      const song = PLAYLIST[state.currentIndex];
+
+      /* Texto */
+      dom.title.textContent  = song.title;
+      dom.artist.textContent = song.artist;
+      dom.genre.textContent  = song.genre;
+
+      /* Emoji como portada */
+      dom.disc.textContent = song.emoji;
+      dom.disc.style.background = `radial-gradient(circle at 40% 40%, ${song.color}22, transparent)`;
+
+      /* Tiempo total */
+      dom.totalTime.textContent = formatTime(song.duration);
+      dom.currentTime.textContent = "0:00";
+
+      /* Progreso a cero */
+      state.elapsed  = 0;
+      state.progress = 0;
+      dom.progressFill.style.width = "0%";
+
+      /* Resaltar ítem activo en la playlist */
+      document.querySelectorAll(".playlist-item").forEach((el, i) => {
+        el.classList.toggle("active", i === state.currentIndex);
+      });
+    }
+
+    /* Construir la lista de reproducción en el DOM */
+    function buildPlaylist() {
+      dom.playlist.innerHTML = "";
+      PLAYLIST.forEach((song, i) => {
+        const li = document.createElement("li");
+        li.className = "playlist-item" + (i === 0 ? " active" : "");
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", i === 0);
+        li.innerHTML = `
+          <!-- Número de pista o barras de EQ si está activa -->
+          <div class="track-num">
+            <span class="track-num-hidden">${i + 1}</span>
+            <div class="eq-bars" aria-hidden="true">
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+            </div>
+          </div>
+          <!-- Miniatura emoji -->
+          <div class="track-thumb">${song.emoji}</div>
+          <!-- Nombre y artista -->
+          <div class="track-details">
+            <div class="track-name">${song.title}</div>
+            <div class="track-artist">${song.artist}</div>
+          </div>
+          <!-- Duración -->
+          <span class="track-dur">${formatTime(song.duration)}</span>
+        `;
+        /* Clic en un ítem de la playlist */
+        li.addEventListener("click", () => {
+          state.currentIndex = i;
+          renderSong();
+          if (!state.isPlaying) togglePlay();
+          else resetTimer();
+        });
+        dom.playlist.appendChild(li);
+      });
+    }
+
+    /* ─── 6. LÓGICA DE REPRODUCCIÓN ─────────────────── */
+    function togglePlay() {
+      state.isPlaying = !state.isPlaying;
+
+      /* Íconos play/pausa */
+      dom.iconPlay.style.display  = state.isPlaying ? "none"  : "block";
+      dom.iconPause.style.display = state.isPlaying ? "block" : "none";
+
+      /* Animaciones visuales */
+      dom.disc.classList.toggle("spinning", state.isPlaying);
+      dom.ring.classList.toggle("playing",  state.isPlaying);
+      dom.pulses.forEach(p => p.classList.toggle("active", state.isPlaying));
+
+      if (state.isPlaying) {
+        resetTimer(); // Iniciar contador de progreso
+      } else {
+        clearInterval(state.timerID); // Pausar contador
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(state.timerID);
+      /* Simula el avance del tiempo cada segundo */
+      state.timerID = setInterval(() => {
+        const song = PLAYLIST[state.currentIndex];
+        state.elapsed = Math.min(state.elapsed + 1, song.duration);
+        state.progress = (state.elapsed / song.duration) * 100;
+
+        /* Actualizar barra y etiqueta */
+        dom.progressFill.style.width = `${state.progress}%`;
+        dom.currentTime.textContent  = formatTime(state.elapsed);
+
+        /* Auto-avanzar al terminar */
+        if (state.elapsed >= song.duration) {
+          clearInterval(state.timerID);
+          if (state.isRepeat) {
+            state.elapsed = 0;
+            resetTimer();
+          } else {
+            nextSong();
+          }
+        }
+      }, 1000);
+    }
+
+    function prevSong() {
+      /* Si lleva más de 3 segundos, reinicia; si no, va a la anterior */
+      if (state.elapsed > 3) {
+        state.elapsed = 0;
+        renderSong();
+        if (state.isPlaying) resetTimer();
+      } else {
+        state.currentIndex = (state.currentIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
+        renderSong();
+        if (state.isPlaying) resetTimer();
+      }
+    }
+
+    function nextSong() {
+      if (state.isShuffle) {
+        /* Aleatorio: elige índice distinto al actual */
+        let next;
+        do { next = Math.floor(Math.random() * PLAYLIST.length); }
+        while (next === state.currentIndex && PLAYLIST.length > 1);
+        state.currentIndex = next;
+      } else {
+        state.currentIndex = (state.currentIndex + 1) % PLAYLIST.length;
+      }
+      renderSong();
+      if (state.isPlaying) resetTimer();
+    }
+
+    /* ─── 7. CLIC EN LA BARRA DE PROGRESO ───────────── */
+    dom.progressTrack.addEventListener("click", e => {
+      const rect    = dom.progressTrack.getBoundingClientRect();
+      const ratio   = (e.clientX - rect.left) / rect.width;
+      const song    = PLAYLIST[state.currentIndex];
+      state.elapsed  = Math.floor(ratio * song.duration);
+      state.progress = ratio * 100;
+      dom.progressFill.style.width = `${state.progress}%`;
+      dom.currentTime.textContent  = formatTime(state.elapsed);
+      if (state.isPlaying) { clearInterval(state.timerID); resetTimer(); }
+    });
+
+    /* ─── 8. CANVAS DE PARTÍCULAS (fondo) ───────────── */
+    (function initParticles() {
+      const canvas = $("particles");
+      const ctx    = canvas.getContext("2d");
+      let W, H, particles;
+
+      function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+
+      function createParticles() {
+        particles = Array.from({ length: 60 }, () => ({
+          x:    Math.random() * W,
+          y:    Math.random() * H,
+          r:    Math.random() * 1.5 + .3,
+          vx:   (Math.random() - .5) * .3,
+          vy:   (Math.random() - .5) * .3,
+          alpha:Math.random() * .5 + .1
+        }));
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        particles.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(196,94,255,${p.alpha})`;
+          ctx.fill();
+          /* Movimiento suave */
+          p.x += p.vx;
+          p.y += p.vy;
+          /* Rebote en bordes */
+          if (p.x < 0 || p.x > W) p.vx *= -1;
+          if (p.y < 0 || p.y > H) p.vy *= -1;
+        });
+        requestAnimationFrame(draw);
+      }
+
+      resize();
+      createParticles();
+      draw();
+      window.addEventListener("resize", () => { resize(); createParticles(); });
+    })();
+
+    /* ─── 9. CANVAS VISUALIZADOR DE ONDAS ───────────── */
+    (function initVisualizer() {
+      const canvas = dom.visualizer;
+      const ctx    = canvas.getContext("2d");
+      const BARS   = 48;
+      let heights  = Array.from({ length: BARS }, () => Math.random() * 30 + 5);
+      let targets  = [...heights];
+
+      function tick() {
+        /* Animamos hacia targets al azar cuando está reproduciendo */
+        if (state.isPlaying) {
+          targets = targets.map(() => Math.random() * 50 + 4);
+        }
+        heights = heights.map((h, i) => h + (targets[i] - h) * .12);
+
+        const W = canvas.width  = canvas.offsetWidth;
+        const H = canvas.height = canvas.offsetHeight;
+        ctx.clearRect(0, 0, W, H);
+
+        const barW = W / BARS - 1.5;
+        heights.forEach((h, i) => {
+          const x    = i * (W / BARS);
+          const grad = ctx.createLinearGradient(0, H, 0, H - h);
+          grad.addColorStop(0, "rgba(196,94,255,.7)");
+          grad.addColorStop(1, "rgba(0,229,255,.4)");
+          ctx.fillStyle   = grad;
+          ctx.beginPath();
+          ctx.roundRect(x, H - h, barW, h, 2);
+          ctx.fill();
+        });
+        requestAnimationFrame(tick);
+      }
+      tick();
+    })();
+
+    /* ─── 10. BINDING DE EVENTOS ─────────────────────── */
+    dom.btnPlay.addEventListener("click",    togglePlay);
+    dom.btnPrev.addEventListener("click",    prevSong);
+    dom.btnNext.addEventListener("click",    nextSong);
+
+    dom.btnShuffle.addEventListener("click", () => {
+      state.isShuffle = !state.isShuffle;
+      dom.btnShuffle.classList.toggle("active", state.isShuffle);
+    });
+
+    dom.btnRepeat.addEventListener("click", () => {
+      state.isRepeat = !state.isRepeat;
+      dom.btnRepeat.classList.toggle("active", state.isRepeat);
+    });
+
+    dom.volumeSlider.addEventListener("input", e => {
+      state.volume = +e.target.value;
+      /* Actualizar icono según nivel de volumen */
+    });
+
+    /* Teclado: Espacio = play/pausa, flechas = prev/next */
+    document.addEventListener("keydown", e => {
+      if (e.target.tagName === "INPUT") return;
+      if (e.code === "Space")      { e.preventDefault(); togglePlay(); }
+      if (e.code === "ArrowRight") nextSong();
+      if (e.code === "ArrowLeft")  prevSong();
+    });
+
+    /* ─── 11. INICIALIZACIÓN ─────────────────────────── */
+    buildPlaylist();
+    renderSong();
+  </script>
+</body>
+</html>

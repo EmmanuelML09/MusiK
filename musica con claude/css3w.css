@@ -1,0 +1,635 @@
+/* ═══════════════════════════════════════════════════════════
+   NeonWave Player — styles.css
+   Técnicas utilizadas:
+     ✔ Variables CSS (Design Tokens)
+     ✔ Glassmorphism  (backdrop-filter + rgba)
+     ✔ Efecto Neón    (box-shadow multicapa)
+     ✔ Animaciones    (@keyframes)
+     ✔ Grid + Flexbox responsive
+     ✔ Pseudo-elementos decorativos (::after)
+     ✔ Scrollbar personalizado
+     ✔ Tipografía variable con clamp()
+═══════════════════════════════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════════════
+   1. DESIGN TOKENS — Variables globales de diseño
+      Centralizar colores, radios y transiciones aquí
+      permite cambiar el tema completo en un solo lugar.
+══════════════════════════════════════════════════════════ */
+:root {
+  /* Paleta de color */
+  --c-bg:        #07060f;               /* fondo oscuro casi negro */
+  --c-surface:   rgba(255,255,255,.04); /* superficie semitransparente */
+  --c-border:    rgba(255,255,255,.09); /* borde sutil */
+  --c-accent1:   #c45eff;              /* violeta neón — color dominante */
+  --c-accent2:   #00e5ff;              /* cian eléctrico — color secundario */
+  --c-accent3:   #ff3d6e;              /* rosa coral — color terciario */
+  --c-text:      #f0eaff;              /* texto principal */
+  --c-muted:     rgba(240,234,255,.4); /* texto secundario / atenuado */
+
+  /* Geometría */
+  --radius-card: 24px;
+  --radius-btn:  50px;
+  --glass-blur:  22px;
+
+  /* Curva de aceleración global */
+  --transition:  .35s cubic-bezier(.4,0,.2,1);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   2. RESET & BASE
+      Elimina márgenes/padding del navegador.
+      box-sizing: border-box incluye padding en el ancho.
+══════════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  padding: 2rem 1rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   3. FONDO ANIMADO — Orbes de luz tipo "aurora"
+      Círculos grandes con filter: blur() y animación
+      alternante (infinite alternate) crean un ambiente
+      vivo sin distraer del contenido principal.
+══════════════════════════════════════════════════════════ */
+.bg-canvas {
+  position: fixed;
+  inset: 0;           /* shorthand para top/right/bottom/left: 0 */
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none; /* no interfiere con clics */
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);   /* difumina el color completamente */
+  opacity: .35;
+  animation: float-orb 18s ease-in-out infinite alternate;
+}
+
+/* Cada orbe tiene posición, tamaño y velocidad distintos */
+.orb-1 {
+  width: 520px; height: 520px;
+  background: var(--c-accent1);
+  top: -120px; left: -80px;
+  animation-duration: 20s;
+}
+.orb-2 {
+  width: 380px; height: 380px;
+  background: var(--c-accent2);
+  bottom: -60px; right: -60px;
+  animation-duration: 15s;
+  animation-delay: -7s;   /* desfase para que no se muevan igual */
+}
+.orb-3 {
+  width: 280px; height: 280px;
+  background: var(--c-accent3);
+  top: 40%; left: 45%;
+  animation-duration: 12s;
+  animation-delay: -3s;
+}
+
+/* Movimiento suave de flotación */
+@keyframes float-orb {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(60px, 40px) scale(1.18); }
+}
+
+/* Canvas de partículas (controlado por JS) */
+#particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   4. LAYOUT PRINCIPAL — CSS Grid de 2 columnas
+      La columna derecha (340px) es la playlist fija.
+      La columna izquierda (1fr) es el reproductor.
+══════════════════════════════════════════════════════════ */
+.app {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   5. GLASSMORPHISM — Clase reutilizable .glass
+      Combina fondo semitransparente + blur de fondo +
+      borde sutil para el efecto "vidrio esmerilado".
+      Se aplica a ambas tarjetas del layout.
+══════════════════════════════════════════════════════════ */
+.glass {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  backdrop-filter: blur(var(--glass-blur));          /* estándar */
+  -webkit-backdrop-filter: blur(var(--glass-blur));  /* Safari */
+  border-radius: var(--radius-card);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   6. TARJETA DEL REPRODUCTOR
+══════════════════════════════════════════════════════════ */
+.player-card {
+  padding: 2.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Badge que muestra el género musical de la canción activa */
+.genre-badge {
+  align-self: flex-start;
+  font-family: 'Space Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  padding: .35rem .9rem;
+  border-radius: 50px;
+  border: 1px solid var(--c-accent1);
+  color: var(--c-accent1);
+  box-shadow: 0 0 12px rgba(196,94,255,.3); /* brillo neón */
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   7. ARTWORK / PORTADA DEL ÁLBUM
+      Usa position: relative + absolute para superponer:
+      pulsos → anillo giratorio → disco
+══════════════════════════════════════════════════════════ */
+.artwork-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;     /* siempre cuadrado */
+  max-width: 300px;
+  align-self: center;
+}
+
+/* Anillo de gradiente cónico que gira al reproducir */
+.artwork-ring {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--c-accent1),
+    var(--c-accent2),
+    var(--c-accent3),
+    var(--c-accent1)
+  );
+  animation: spin-ring 6s linear infinite;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.artwork-ring.playing { opacity: 1; } /* JS añade esta clase */
+
+@keyframes spin-ring {
+  to { transform: rotate(360deg); }
+}
+
+/* Contenedor circular del emoji/portada */
+.artwork-mask {
+  position: relative;
+  z-index: 1;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid var(--c-bg); /* separa el disco del anillo */
+}
+
+/* El emoji que actúa como portada */
+.artwork-disc {
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  transition: transform var(--transition);
+  animation: none;
+}
+.artwork-disc.spinning {
+  animation: disc-spin 4s linear infinite;
+}
+@keyframes disc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Ondas de pulso que se expanden al reproducir */
+.audio-pulse {
+  position: absolute;
+  inset: -30px;
+  border-radius: 50%;
+  border: 2px solid rgba(196,94,255,.2);
+  animation: pulse-ring 2s ease-out infinite;
+  opacity: 0;
+}
+.audio-pulse.active { opacity: 1; }
+/* Cada pulso sale desfasado para efecto ola */
+.audio-pulse:nth-child(2) { animation-delay: .6s; }
+.audio-pulse:nth-child(3) { animation-delay: 1.2s; }
+
+@keyframes pulse-ring {
+  0%   { transform: scale(.85); opacity: .6; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   8. INFORMACIÓN DE LA CANCIÓN
+      Título con gradiente en el texto usando
+      background-clip: text (técnica moderna CSS).
+══════════════════════════════════════════════════════════ */
+.song-info { text-align: center; }
+
+.song-title {
+  /* clamp(mínimo, preferido, máximo) — tipografía fluida */
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  /* Gradiente aplicado al texto */
+  background: linear-gradient(135deg, var(--c-text), var(--c-accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.song-artist {
+  margin-top: .4rem;
+  font-size: .9rem;
+  color: var(--c-muted);
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .05em;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   9. BARRA DE PROGRESO
+      Track (fondo) + Fill (relleno) + pseudo ::after (thumb)
+      El thumb aparece solo con :hover para limpieza visual.
+══════════════════════════════════════════════════════════ */
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+.progress-track {
+  width: 100%; height: 6px;
+  background: rgba(255,255,255,.1);
+  border-radius: 99px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+/* El relleno avanza — JS actualiza su width en % */
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--c-accent1), var(--c-accent2));
+  box-shadow: 0 0 10px var(--c-accent1); /* neón */
+  transition: width .4s linear;
+  position: relative;
+}
+
+/* Thumb circular que aparece al pasar el cursor */
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -3px; top: 50%;
+  transform: translateY(-50%);
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px var(--c-accent2);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.progress-track:hover .progress-fill::after { opacity: 1; }
+
+.time-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  color: var(--c-muted);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   10. CONTROLES DE REPRODUCCIÓN
+       Flexbox centrado. El botón Play destaca visualmente
+       con gradiente y sombra neón doble.
+══════════════════════════════════════════════════════════ */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+}
+
+/* Botones secundarios (shuffle, prev, next, repeat) */
+.btn-ctrl {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--c-muted);
+  transition: color var(--transition), transform var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: .4rem;
+}
+.btn-ctrl:hover {
+  color: var(--c-text);
+  transform: scale(1.15);
+}
+.btn-ctrl svg {
+  width: 24px; height: 24px;
+  fill: currentColor;
+}
+/* Estado activo (shuffle/repeat encendido) */
+.btn-ctrl.active { color: var(--c-accent1); }
+
+/* Botón Play principal */
+.btn-play {
+  width: 62px; height: 62px;
+  background: linear-gradient(135deg, var(--c-accent1), var(--c-accent2));
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Sombra neón en dos capas para profundidad */
+  box-shadow:
+    0 0 24px rgba(196,94,255,.5),
+    0 0 48px rgba(0,229,255,.2);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.btn-play:hover {
+  transform: scale(1.1);
+  box-shadow:
+    0 0 36px rgba(196,94,255,.7),
+    0 0 64px rgba(0,229,255,.3);
+}
+.btn-play:active { transform: scale(.95); }
+.btn-play svg {
+  width: 26px; height: 26px;
+  fill: #fff;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   11. CONTROL DE VOLUMEN
+       Range input personalizado — elimina el estilo nativo
+       y aplica un thumb redondo con brillo neón.
+══════════════════════════════════════════════════════════ */
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+}
+.volume-icon {
+  color: var(--c-muted);
+  flex-shrink: 0;
+}
+.volume-icon svg {
+  width: 18px; height: 18px;
+  fill: currentColor;
+}
+
+/* Eliminar estilo nativo del range */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255,255,255,.12);
+  cursor: pointer;
+  outline: none;
+}
+/* Thumb — WebKit (Chrome, Safari, Edge) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--c-accent1);
+  box-shadow: 0 0 8px var(--c-accent1);
+  cursor: pointer;
+  transition: transform .2s;
+}
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.3);
+}
+/* Thumb — Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--c-accent1);
+  border: none;
+  box-shadow: 0 0 8px var(--c-accent1);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   12. CANVAS VISUALIZADOR DE ONDAS
+       El canvas es transparente — JS dibuja barras encima.
+══════════════════════════════════════════════════════════ */
+#visualizer {
+  width: 100%;
+  height: 60px;
+  border-radius: 12px;
+  opacity: .7;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   13. PLAYLIST — Panel lateral
+══════════════════════════════════════════════════════════ */
+.playlist-card {
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 580px;
+}
+
+.playlist-header {
+  font-size: .7rem;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  padding-bottom: .8rem;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.playlist-list {
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  flex: 1;
+  /* Scrollbar delgado y con color de marca */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(196,94,255,.4) transparent;
+}
+.playlist-list::-webkit-scrollbar { width: 4px; }
+.playlist-list::-webkit-scrollbar-thumb {
+  background: rgba(196,94,255,.4);
+  border-radius: 99px;
+}
+
+/* Ítem individual de la playlist */
+.playlist-item {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .75rem .9rem;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+  border: 1px solid transparent;
+}
+.playlist-item:hover {
+  background: rgba(255,255,255,.06);
+  transform: translateX(4px); /* micro-interacción de deslizamiento */
+}
+/* Pista actualmente seleccionada */
+.playlist-item.active {
+  background: rgba(196,94,255,.12);
+  border-color: rgba(196,94,255,.25);
+}
+
+/* Número de pista */
+.track-num {
+  font-family: 'Space Mono', monospace;
+  font-size: .7rem;
+  color: var(--c-muted);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.playlist-item.active .track-num { color: var(--c-accent1); }
+
+/* Barras de ecualizador animadas (visibles solo en pista activa) */
+.eq-bars {
+  display: none;   /* JS las muestra en la pista activa */
+  gap: 2px;
+  align-items: flex-end;
+  height: 16px;
+}
+.playlist-item.active .eq-bars      { display: flex; }
+.playlist-item.active .track-num-hidden { display: none; }
+
+.eq-bar {
+  width: 3px;
+  background: var(--c-accent1);
+  border-radius: 2px;
+  animation: eq-bounce .7s ease-in-out infinite alternate;
+}
+.eq-bar:nth-child(2) { animation-duration: .5s; animation-delay: .1s; }
+.eq-bar:nth-child(3) { animation-duration: .9s; animation-delay: .2s; }
+
+@keyframes eq-bounce {
+  from { height: 4px; }
+  to   { height: 14px; }
+}
+
+/* Miniatura emoji de la canción */
+.track-thumb {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  background: rgba(255,255,255,.06);
+}
+
+/* Bloque de texto (nombre + artista) */
+.track-details {
+  flex: 1;
+  min-width: 0; /* permite que text-overflow funcione en flex */
+}
+.track-name {
+  font-size: .88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* "..." si el nombre es muy largo */
+}
+.track-artist {
+  font-size: .72rem;
+  color: var(--c-muted);
+  font-family: 'Space Mono', monospace;
+  margin-top: .15rem;
+}
+
+/* Duración de la pista */
+.track-dur {
+  font-family: 'Space Mono', monospace;
+  font-size: .7rem;
+  color: var(--c-muted);
+  flex-shrink: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   14. FOOTER DE CRÉDITOS
+══════════════════════════════════════════════════════════ */
+.credits {
+  grid-column: 1 / -1; /* ocupa las 2 columnas del grid */
+  text-align: center;
+  font-family: 'Space Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: .12em;
+  color: rgba(255,255,255,.2);
+  padding: .5rem 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   15. RESPONSIVE — Mobile first
+       Por debajo de 720px el grid pasa a 1 columna.
+       La playlist se reduce en altura para caber en pantalla.
+══════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  .app {
+    grid-template-columns: 1fr; /* una sola columna */
+  }
+  .playlist-card {
+    max-height: 320px;
+  }
+}
